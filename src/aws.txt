@@ -1,0 +1,201 @@
+npm install aws-sdk multer-s3
+
+
+// file-upload.module.ts
+
+import { Module } from '@nestjs/common';
+import { MulterModule } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as multerS3 from 'multer-s3';
+import { S3 } from 'aws-sdk';
+import { FileUploadController } from './file-upload.controller';
+
+@Module({
+  imports: [
+    MulterModule.registerAsync({
+      useFactory: () => ({
+        storage: diskStorage({
+          destination: './uploads', // Local directory
+          filename: (req, file, callback) => {
+            const originalName = file.originalname;
+            callback(null, originalName); // Use the original filename for local storage
+          },
+        }),
+      }),
+    }),
+    MulterModule.registerAsync({
+      useFactory: () => ({
+        storage: multerS3({
+          s3: new S3(),
+          bucket: 'your-bucket-name', // AWS S3 bucket name
+          acl: 'public-read', // Adjust permissions as needed
+          contentType: multerS3.AUTO_CONTENT_TYPE, // Automatically set content type
+          key: (req, file, callback) => {
+            callback(null, file.originalname); // Use the original filename as the S3 key
+          },
+        }),
+      }),
+    }),
+  ],
+  controllers: [FileUploadController],
+})
+export class FileUploadModule {}
+
+
+// file-upload.controller.ts
+
+import { Controller, Post, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as multerS3 from 'multer-s3';
+import { S3 } from 'aws-sdk';
+
+@Controller('files')
+export class FileUploadController {
+  @Post('upload')
+  @UseInterceptors(FilesInterceptor('files'))
+  async uploadFiles(@UploadedFiles() files: Express.Multer.File[]) {
+    // Handle uploaded files
+    return { files };
+  }
+}
+
+
+// app.module.ts
+
+import { Module } from '@nestjs/common';
+import { FileUploadModule } from './file-upload/file-upload.module';
+
+@Module({
+  imports: [FileUploadModule],
+})
+export class AppModule {}
+
+
+bucket: 'your-bucket-name', // AWS S3 bucket name
+
+
+
+npm install aws-sdk
+
+
+// main.ts
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { AWSConfig } from './aws.config'; // Import your AWS configuration
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Configure AWS SDK with your AWS credentials
+  AWSConfig.configAWS();
+
+  await app.listen(3000);
+}
+bootstrap();
+
+
+
+// aws.config.ts
+
+import AWS from 'aws-sdk';
+
+export class AWSConfig {
+  static configAWS() {
+    // Set AWS credentials and region
+    AWS.config.update({
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      region: process.env.AWS_REGION,
+    });
+  }
+}
+
+
+
+// file-upload.module.ts
+
+import { Module } from '@nestjs/common';
+import { MulterModule } from '@nestjs/platform-express';
+import * as multerS3 from 'multer-s3';
+import { S3 } from 'aws-sdk';
+import { FileUploadController } from './file-upload.controller';
+
+@Module({
+  imports: [
+    MulterModule.registerAsync({
+      useFactory: () => ({
+        storage: multerS3({
+          s3: new S3(),
+          bucket: 'your-bucket-name', // Replace with your S3 bucket name
+          acl: 'public-read', // Adjust permissions as needed
+          contentType: multerS3.AUTO_CONTENT_TYPE, // Automatically set content type
+          key: (req, file, callback) => {
+            callback(null, file.originalname); // Use the original filename as the S3 key
+          },
+        }),
+      }),
+    }),
+  ],
+  controllers: [FileUploadController],
+})
+export class FileUploadModule {}
+
+
+
+// aws.module.ts
+
+import { Module } from '@nestjs/common';
+import { S3Service } from './s3.service';
+
+@Module({
+  providers: [S3Service],
+  exports: [S3Service],
+})
+export class AWSModule {}
+
+
+// s3.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { S3 } from 'aws-sdk';
+
+@Injectable()
+export class S3Service {
+  private s3: S3;
+
+  constructor() {
+    this.s3 = new S3({
+      // Set AWS credentials and region
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      region: process.env.AWS_REGION,
+    });
+  }
+
+  // Add methods here to interact with S3, such as upload, download, delete, etc.
+}
+
+
+// file-upload.module.ts
+
+import { Module } from '@nestjs/common';
+import { MulterModule } from '@nestjs/platform-express';
+import { S3Service } from './aws/s3.service';
+import { FileUploadController } from './file-upload.controller';
+
+@Module({
+  imports: [
+    MulterModule.registerAsync({
+      useFactory: (s3Service: S3Service) => ({
+        storage: s3Service.createMulterS3Storage(),
+      }),
+      inject: [S3Service],
+    }),
+  ],
+  controllers: [FileUploadController],
+})
+export class FileUploadModule {}
+
+

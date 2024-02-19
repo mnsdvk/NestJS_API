@@ -1,0 +1,69 @@
+
+
+1. Handle 404 when data not found on particular id for GET
+4. In delete if Id will not exist it should give error DELETE
+2. Post API can get both ID and Task name 
+    a) if Id exists then it will give duplicate error else it will create new entry on that id
+    b) if Id will not pass then it will create a new entry
+
+    
+3. Handle query parameters in get API
+
+5. write unit test case for the API
+
+
+
+
+
+
+// Assume we have a UserService with a method deleteUserById
+// This method returns a Promise that resolves with a boolean indicating success/failure
+
+// users.service.ts
+@Injectable()
+export class UserService {
+  async deleteUserById(id: number): Promise<boolean> {
+    // Implementation to delete the user by ID from the database
+    // Returns true if user is deleted successfully, false otherwise
+  }
+}
+
+// users.controller.ts
+@Controller('users')
+export class UsersController {
+  constructor(private readonly userService: UserService) {}
+
+  @Delete(':id')
+  async deleteUser(@Param('id') id: number): Promise<boolean> {
+    return await this.userService.deleteUserById(id);
+  }
+}
+
+// users.controller.spec.ts (unit test file)
+describe('UsersController', () => {
+  let controller: UsersController;
+  let userService: UserService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [UsersController],
+      providers: [
+        UserService,
+      ],
+    }).compile();
+
+    controller = module.get<UsersController>(UsersController);
+    userService = module.get<UserService>(UserService);
+  });
+
+  it('should delete a user when valid id is provided', async () => {
+    // Mock the deleteUserById method of the userService to resolve successfully
+    jest.spyOn(userService, 'deleteUserById').mockResolvedValue(true);
+
+    // Call the controller method
+    const result = await controller.deleteUser(1);
+
+    // Assert the result
+    expect(result).toEqual(true);
+  });
+});

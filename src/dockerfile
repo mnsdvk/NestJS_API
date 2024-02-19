@@ -1,0 +1,42 @@
+# Using multi-stage build (supported Docker 17 and later)
+# Original image 225MB and now 71MB
+
+# ------ Stage 1 (build) --------
+FROM node:18.16.0-alpine AS build
+
+# Create app directory
+WORKDIR /usr/src/app
+
+RUN apk add --no-cache tree
+
+# copy everything from current codebuild dir to working dir
+COPY . .
+
+# Add compile dependencies (since Alpine doesn't have python to compile libs)
+RUN apk update && \
+    apk --no-cache --virtual build-dependencies add \
+    python3 \
+    make \
+    g++ \
+    && npm install \
+    && apk del build-dependencies
+
+# Create ./dist folder for deploy later
+RUN npm run build
+
+# ------ Stage 2 (release) ------
+FROM node:18.16.0-alpine AS release
+WORKDIR /usr/src/app
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/package.json .
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/.env ./.env
+
+# Expose port 3000 and start app
+# ENV variables for new relic
+ENV NEW_RELIC_NO_CONFIG_FILE=true \
+    NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true \
+    NEW_RELIC_LOG=stdout
+
+EXPOSE 3000
+CMD [ "npm", "start" ]
